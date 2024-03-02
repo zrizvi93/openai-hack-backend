@@ -53,6 +53,10 @@ def gpt4_async_response():
         t.join()
 
     return Response(generate(), content_type='text/plain')
+
+@app.route('/long_text', methods=['GET'])
+def long_text():
+    return Response('FAKE TEXT', content_type='text/plain')
     
 @app.route('/gpt4', methods=['GET'])
 def gpt4_response():
@@ -61,10 +65,10 @@ def gpt4_response():
             messages=[
                 {
                     "role": "user",
-                    "content": "How are you today?",
+                    "content": "Say this is a test",
                 }
             ],
-            model="gpt-4",
+            model="gpt-3.5-turbo",
             max_tokens=1000
         )
         return jsonify({'response': response.choices[0].message.content}), 200
