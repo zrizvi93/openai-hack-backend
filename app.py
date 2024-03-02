@@ -44,8 +44,11 @@ def generate_stream(user_input):
             stream=True,
         )
         for chunk in stream:
-            if chunk['choices'][0]['message']['content']:
-                yield chunk['choices'][0]['message']['content']
+            if chunk.choices[0].delta.content is not None:
+                yield str(chunk.choices[0].delta.content)
+        # for chunk in stream:
+        #     if chunk['choices'][0]['message']['content']:
+        #         yield chunk['choices'][0]['message']['content']
     except Exception as e:
         yield str(e)  # Handle exceptions
 
