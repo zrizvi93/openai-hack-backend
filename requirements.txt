@@ -2,5 +2,4 @@ Flask
 Gunicorn
 openai
 asyncio
-threading
 queue
