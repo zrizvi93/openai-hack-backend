@@ -1,4 +1,4 @@
-from flask import Flask, jsonify, Response
+from flask import Flask, jsonify, Response, request
 from openai import OpenAI, AsyncOpenAI
 import os
 
@@ -11,6 +11,14 @@ app = Flask(__name__)
 client = AsyncOpenAI(
     api_key=os.environ.get("OPENAI_API_KEY"),
 )
+
+assistant = client.beta.assistants.create(
+    name="Career Mentor",
+    instructions="You are a career mentor. Answer questions briefly, in a sentence or less.",
+    model="gpt-4-1106-preview",
+)
+
+threads_map = {}
 
 def stream_gpt4_responses(queue):
     async def async_stream():
@@ -28,8 +36,8 @@ def stream_gpt4_responses(queue):
     asyncio.set_event_loop(loop)
     loop.run_until_complete(async_stream())
 
-@app.route('/gpt4', methods=['GET'])
-def gpt4_response():
+@app.route('/gpt4async', methods=['GET'])
+def gpt4_async_response():
     queue = Queue()
     def generate():
         t = threading.Thread(target=stream_gpt4_responses, args=(queue,))
@@ -45,18 +53,44 @@ def gpt4_response():
         t.join()
 
     return Response(generate(), content_type='text/plain')
+    
+@app.route('/gpt4', methods=['GET'])
+def gpt4_response():
+    try:
+        response = client.chat.completions.create(
+            messages=[
+                {
+                    "role": "user",
+                    "content": "How are you today?",
+                }
+            ],
+            model="gpt-4",
+            max_tokens=1000
+        )
+        return jsonify({'response': response.choices[0].message.content}), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/assistants', methods=['GET'])
 def assistants_response():
     try:
-        response = client.chat.completions.create(
-            model="gpt-4",
-            messages=[
-                {"role": "system", "content": "You are a helpful assistant."},
-                {"role": "user", "content": "How are you today?"}
-            ]
+        sessionID = request.headers.get("sessionID", "")
+        # get the thread if it exists for the sessionID, if not, initialize a new thread for the session
+        thread = threads_map.get(sessionID,client.beta.threads.create())
+        message = client.beta.threads.messages.create(
+            thread_id=thread.id,
+            role="user",
+            content="I need to solve the equation `3x + 11 = 14`. Can you help me?",
         )
-        return jsonify({'response': response.choices[0].message['content'].strip()}), 200
+        return "In Progress", 200
+        # response = client.chat.completions.create(
+        #     model="gpt-4",
+        #     messages=[
+        #         {"role": "system", "content": "You are a helpful assistant."},
+        #         {"role": "user", "content": "How are you today?"}
+        #     ]
+        # )
+        # return jsonify({'response': response.choices[0].message['content'].strip()}), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
