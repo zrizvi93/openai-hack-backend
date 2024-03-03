@@ -104,7 +104,7 @@ def conversation():
                                             "sessionID": message.thread_id,
                                             "role": message.role,
                                             "content_type": content.type,
-                                            "content": content.text if content.type == "text" else content.image_file
+                                            "content": str(content.text.value) if content.type == "text" else str(content.image_file.file_id)
                                             })
         else:
             break
@@ -141,7 +141,7 @@ def gpt4_response():
             model="gpt-4-turbo-preview",
             max_tokens=1000
         )
-        return jsonify({'response': response.choices[0].message.content}), 200
+        return jsonify({'response': str(response.choices[0].message.content)}), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
