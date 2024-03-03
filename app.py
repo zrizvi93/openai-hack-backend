@@ -61,14 +61,15 @@ def conversation():
     assistant = None
     user_input = request.json.get('message', '')
     sessionID = request.headers.get("sessionID", "")
+    userID = request.headers.get("userID", "")
     # get the thread if it exists for the sessionID, if not, initialize a new thread for the session
     thread = THREADS_MAP.get(sessionID, client.beta.threads.create())
-    if sessionID == 'sharon':
+    if userID == 'sharon':
         assistant = sharon_bot_assistant
-    elif sessionID == 'finn':
+    elif userID == 'finn':
         assistant = finn_bot_assistant
     else:
-        assistant == generic_assistant
+        assistant = generic_assistant
 
     # Post the user message to the asssitant
     message = client.beta.threads.messages.create(
