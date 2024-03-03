@@ -10,6 +10,8 @@ import threading
 from queue import Queue, Empty
 from functions.dalle import DALLE_FUNCTION
 
+dummy_flag = True
+
 app = Flask(__name__)
 
 THREADS_MAP = {}
@@ -75,7 +77,29 @@ def conversation():
     else:
         assistant = generic_assistant
 
-    # Post the user message to the asssitant
+    # Dummy flag to save costs for testing
+    if dummy_flag and userID == 'sharon':
+        dummy_content = {
+            "path1": {
+                "name": "Move back to Singapore", 
+                "description": "If you choose to move back to Singapore, in 20 years, you'll find yourself deeply integrated into the rich cultural tapestry that defines the city-state. Your home is filled with the aromas of local cuisines you've mastered over the years. Family gatherings are a weekly highlight, where laughter and stories fill the air. Professionally, you've carved out a niche in Singapore's burgeoning tech scene, leveraging your international experience to foster connections and innovations that bridge East and West. The sense of belonging and the close-knit community you've built around you are your greatest sources of happiness.",
+                "image_urls": ["https://crossroadsbucket.s3.us-west-2.amazonaws.com/path1%3A-3314722688263737280.png","https://crossroadsbucket.s3.us-west-2.amazonaws.com/path1%3A-8584559003477515054.png", "https://crossroadsbucket.s3.us-west-2.amazonaws.com/path1%3A2296003398307106680.png", "https://crossroadsbucket.s3.us-west-2.amazonaws.com/path1%3A7976919207731705464.png"],
+                },
+            "path2": {
+                "name": "Stay in San Francisco", 
+                "description": "On the other hand, should you choose to stay in the Bay Area, 20 years from now, you'll find yourself living in a cozy, technology-filled home in a quiet, leafy suburb close to the heart of Silicon Valley. You've made a significant impact in the tech industry, leading initiatives that have shaped the future of technology. While your career is fulfilling and your social life vibrant, there's a lingering sense of nostalgia for the familial closeness and cultural richness of Singapore. Despite this, the opportunities you've seized and the life you've built in the Bay Area have molded you into a globally respected leader, cherished friend, and a pioneer in your field.",
+                "image_urls": ["https://crossroadsbucket.s3.us-west-2.amazonaws.com/path2%3A-5677335532780567126.png", "https://crossroadsbucket.s3.us-west-2.amazonaws.com/path2%3A-7719549257588876346.png", "https://crossroadsbucket.s3.us-west-2.amazonaws.com/path2%3A4056449266245581403.png", "https://crossroadsbucket.s3.us-west-2.amazonaws.com/path2%3A4384264233050141296.png"],
+                }
+        }
+        conversation_json = {"id": -1,
+                            "sessionID": sessionID or thread.id,
+                            "role": "assistant",
+                            "content_type": "text",
+                            "content": dummy_content
+                            }
+        return Response(json.dumps(conversation_json))
+
+    # Post the user message to the assistant
     message = client.beta.threads.messages.create(
         thread_id=thread.id,
         role="user",
@@ -172,6 +196,7 @@ def gpt4_response():
         return jsonify({'error': str(e)}), 500
 
 def getDalleImages(prompt: str, path_num: str):
+    print(f"Calling DALL-E for prompt: {prompt}, path: {path_num}")
     generation_response = client.images.generate(
         model = "dall-e-3",
         style="vivid",
@@ -199,6 +224,7 @@ def getDalleImages(prompt: str, path_num: str):
 # Or the images could be in their own message
 
 def _parse_message(message, has_images):
+    print(f"Parsing message: {message}")
     pattern = r'\n\n(.*?)\n\n'
     matches = re.findall(pattern, message)
     output = message
