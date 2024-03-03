@@ -25,7 +25,7 @@ finn_bot_assistant = client.beta.assistants.retrieve(assistant_id='asst_J9iDe4fO
 generic_assistant = client.beta.assistants.create(
     name="Career Mentor",
     instructions="You are a career mentor. Answer questions briefly, in a sentence or less.",
-    model="gpt-4-1106-preview",
+    model="gpt-4-turbo-preview",
 )
 
 
@@ -109,9 +109,10 @@ def conversation():
         else:
             break
     # serialize json before sending over the wire
-    conversation_json = json.dumps(conversation_output)
+    conversation_json = json.dumps(conversation_json)
+    # return Response(generate_stream(conversation_json))
     # send it over in chunks
-    return Response(generate_stream(conversation_json))
+    # return Response(generate_stream(conversation_json))
 
 # @app.route('/picture', methods=['GET'])
 # def gpt4_response():
