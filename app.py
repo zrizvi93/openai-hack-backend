@@ -86,8 +86,8 @@ def conversation():
     )
     while run.status in ["queued", "in_progress"]:
         run = client.beta.threads.runs.retrieve(
-        thread_id=thread.id,
-        run_id=run.id
+            thread_id=thread.id,
+            run_id=run.id
         )
 
     # It's possible the assistant can post multiple messages
@@ -142,30 +142,6 @@ def gpt4_response():
         return jsonify({'response': response.choices[0].message.content}), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 500
-
-# @app.route('/assistants', methods=['GET'])
-# def assistants_response():
-#     try:
-#         sessionID = request.headers.get("sessionID", "")
-#         # get the thread if it exists for the sessionID, if not, initialize a new thread for the session
-#         thread = THREADS_MAP.get(sessionID, client.beta.threads.create())
-
-#         message = client.beta.threads.messages.create(
-#             thread_id=thread.id,
-#             role="user",
-#             content="I need to solve the equation `3x + 11 = 14`. Can you help me?",
-#         )
-
-#         response = client.chat.completions.create(
-#             model="gpt-4",
-#             messages=[
-#                 {"role": "system", "content": "You are a helpful assistant."},
-#                 {"role": "user", "content": "How are you today?"}
-#             ]
-#         )
-#         return jsonify({'response': response.choices[0].message.content}), 200
-#     except Exception as e:
-#         return jsonify({'error': str(e)}), 500
 
 
 if __name__ == '__main__':
