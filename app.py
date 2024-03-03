@@ -4,8 +4,11 @@ import os
 import json
 
 import asyncio
+import re
+import requests
 import threading
 from queue import Queue, Empty
+from functions.dalle import DALLE_FUNCTION
 
 app = Flask(__name__)
 
@@ -22,11 +25,7 @@ client = OpenAI(
 # Assistants
 sharon_bot_assistant = client.beta.assistants.retrieve(assistant_id='asst_MdVycnMtxDnpID4AFUVGucA1')
 finn_bot_assistant = client.beta.assistants.retrieve(assistant_id='asst_J9iDe4fOUnS1FcMnOcGnn17f')
-generic_assistant = client.beta.assistants.create(
-    name="Career Mentor",
-    instructions="You are a career mentor. Answer questions briefly, in a sentence or less.",
-    model="gpt-4-turbo-preview",
-)
+generic_assistant = client.beta.assistants.retrieve(assistant_id='asst_pxYUpYo4Lg2miYZ4yWK9qmXn')
 
 
 # App Routes
@@ -59,6 +58,7 @@ def generate_stream(user_input):
 @app.route('/conversation', methods=['POST'])
 def conversation():
     assistant = None
+    has_images = False
     user_input = request.json.get('message', '')
     sessionID = request.headers.get("sessionID", "")
     userID = request.headers.get("userID", "")
@@ -86,7 +86,7 @@ def conversation():
         thread_id=thread.id,
         assistant_id=assistant.id,
         model="gpt-4-turbo-preview",
-        tools=[{"type": "retrieval"}]
+        tools=[{"type": "retrieval"}, DALLE_FUNCTION],
     )
     while run.status in ["queued", "in_progress"]:
         run = client.beta.threads.runs.retrieve(
@@ -94,6 +94,27 @@ def conversation():
             run_id=run.id
         )
 
+    if run.status == "requires_action":
+        tool_calls = run.required_action.submit_tool_outputs.tool_calls
+        outputs=[]
+        for tool_call in tool_calls:
+            name = tool_call.function.name
+            arguments = json.loads(tool_call.function.arguments)
+            if name == "getDalleImages" and "prompt" in arguments:
+                has_images = True
+                url, path_num = getDalleImages(arguments["prompt"], arguments["path_num"])
+                outputs.append({"tool_call_id": tool_call.id, "output": (f"Path: {path_num}", url)})
+        run = client.beta.threads.runs.submit_tool_outputs(
+            thread_id=thread.id,
+            run_id=run.id,
+            tool_outputs=outputs,
+        )
+        while run.status in ["queued", "in_progress"]:
+            run = client.beta.threads.runs.retrieve(
+                thread_id=thread.id,
+                run_id=run.id
+            )
+        
     # It's possible the assistant can post multiple messages
     # before the next user input
     messages = client.beta.threads.messages.list(
@@ -108,7 +129,7 @@ def conversation():
                                             "sessionID": message.thread_id,
                                             "role": message.role,
                                             "content_type": content.type,
-                                            "content": str(content.text.value) if content.type == "text" else str(content.image_file.file_id)
+                                            "content": _parse_message(content.text.value, has_images),
                                             })
         else:
             break
@@ -150,6 +171,55 @@ def gpt4_response():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+def getDalleImages(prompt: str, path_num: str):
+    generation_response = client.images.generate(
+        model = "dall-e-3",
+        style="vivid",
+        prompt=prompt,
+        n=1,
+        size="1024x1024",
+        response_format="url",
+    )
+    generated_image_name = f"{hash(prompt)}.png"
+    generated_image_url = generation_response.data[0].url
+    generated_image = requests.get(generated_image_url).content
+
+    # Optional: Save locally
+    image_dir_name = "images"
+    image_dir = os.path.join(os.curdir, image_dir_name)
+    if not os.path.isdir(image_dir):
+        os.mkdir(image_dir)
+    generated_image_filepath = os.path.join(image_dir, generated_image_name)
+    with open(generated_image_filepath, "wb") as image_file:
+        image_file.write(generated_image)
+
+    return generated_image_url, path_num
+
+# The same message may include the 2 paths and the image(s)
+# Or the images could be in their own message
+
+def _parse_message(message, has_images):
+    pattern = r'\n\n(.*?)\n\n'
+    matches = re.findall(pattern, message)
+    output = message
+    if matches and len(matches) == 2:
+        parts = re.split(pattern, message)
+        # The descriptions should be in the parts after the matches
+        path1_description = parts[2].strip() if len(parts) > 2 else ""
+        path2_description = parts[4].strip() if len(parts) > 4 else ""
+        output = {
+            "path1": {"name": matches[0], "description": path1_description},
+            "path2": {"name": matches[1], "description": path2_description}
+        }
+        if has_images:
+            image_url_pattern = r'\!\[.*?\]\((.*?)\)'
+            path1_images = re.findall(image_url_pattern, path1_description)
+            path2_images = re.findall(image_url_pattern, path2_description)
+            if path1_images:
+                output["path1"]["image_urls"] = path1_images
+            if path2_images:
+                output["path2"]["image_urls"] = path2_images
+    return output
 
 if __name__ == '__main__':
     app.run(debug=True, threaded=True)
