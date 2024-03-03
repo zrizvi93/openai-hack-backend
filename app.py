@@ -40,7 +40,7 @@ def generate_stream(user_input):
     try:
         stream = client.chat.completions.create(
             model="gpt-4",
-            messages=[{"role": "user", "content": "Say this is a test"}],
+            messages=[{"role": "user", "content": "Give me a lengthy explanation of quantum physics"}],
             stream=True,
         )
         for chunk in stream:
