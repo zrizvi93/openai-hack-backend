@@ -4,8 +4,8 @@ import json
 from utilities import save_image
 
 
-st.set_page_config(page_title="The Crossroads v0.0.1", initial_sidebar_state="auto", layout="wide", menu_items=None)
-st.title("The Crossroads: Prototype v0.0.1")
+st.set_page_config(page_title="The Crossroads v0.0.1", initial_sidebar_state="auto", page_icon="🎌", layout="wide", menu_items=None)
+st.title("🎌 The Crossroads: Prototype v0.0.1")
 
 client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 ASST_PROMPT = "I need help making a decision."
@@ -13,8 +13,6 @@ ASST_PROMPT = "I need help making a decision."
 if "openai_model" not in st.session_state:
     st.session_state["openai_model"] = "gpt-3.5-turbo"
 
-# Initialize user-specific assistant with one document
-# I just finished a 3-year journey as a CTO at a fintech startup. I left because I was getting bored and burned out. I'm thinking between doing an 'eat pray love' journey of self-discovery around the world, or taking advantage of the current wave of AI development to try to start something new. I'm not sure which path to take. What do you think?
 st.session_state["user_name"] = st.text_input("What's your name?")
 file = st.file_uploader("Upload a document representing your life right now (pdf, docx, txt)", type=["pdf", "docx", "txt"])
 if file:
