@@ -25,9 +25,9 @@ client = OpenAI(
 )
 
 # Assistants
-sharon_bot_assistant = client.beta.assistants.retrieve(assistant_id='asst_MdVycnMtxDnpID4AFUVGucA1')
+sharon_bot_assistant = client.beta.assistants.retrieve(assistant_id='asst_JA79U27AC5ngW12h3ceuvDuR')
 finn_bot_assistant = client.beta.assistants.retrieve(assistant_id='asst_J9iDe4fOUnS1FcMnOcGnn17f')
-generic_assistant = client.beta.assistants.retrieve(assistant_id='asst_pxYUpYo4Lg2miYZ4yWK9qmXn')
+generic_assistant = client.beta.assistants.retrieve(assistant_id='asst_hftOvxwLTZeVfKJrRVFclc2R')
 
 
 # App Routes
