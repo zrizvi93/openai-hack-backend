@@ -112,6 +112,7 @@ def conversation():
         model="gpt-4-turbo-preview",
         tools=[{"type": "retrieval"}, DALLE_FUNCTION],
     )
+    print(f"Run status: {run.status}")
     while run.status in ["queued", "in_progress"]:
         run = client.beta.threads.runs.retrieve(
             thread_id=thread.id,
