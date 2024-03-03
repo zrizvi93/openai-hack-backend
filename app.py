@@ -63,7 +63,11 @@ def conversation():
     sessionID = request.headers.get("sessionID", "")
     userID = request.headers.get("userID", "")
     # get the thread if it exists for the sessionID, if not, initialize a new thread for the session
-    thread = THREADS_MAP.get(sessionID, client.beta.threads.create())
+    if not sessionID:
+        thread = client.beta.threads.create()
+        THREADS_MAP[thread.id] = thread
+    else:
+        thread = THREADS_MAP[sessionID]
     if userID == 'sharon':
         assistant = sharon_bot_assistant
     elif userID == 'finn':
