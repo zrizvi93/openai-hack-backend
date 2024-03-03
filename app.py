@@ -99,11 +99,13 @@ def conversation():
     # Only want the most recent messages in the thread sent by the assistant
     for message in messages:
         if message.role != "user":
-            conversation_output.append({"id": message.id,
-                                        "sessionID": message.thread_id,
-                                        "role": message.role,
-                                        "content": message.content
-                                        })
+            for content in message.content:
+                conversation_output.append({"id": message.id,
+                                            "sessionID": message.thread_id,
+                                            "role": message.role,
+                                            "content_type": content.type,
+                                            "content": content.text if content.type == "text" else content.image_file
+                                            })
         else:
             break
     # serialize json before sending over the wire
