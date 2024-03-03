@@ -109,8 +109,8 @@ def conversation():
         else:
             break
     # serialize json before sending over the wire
-    conversation_json = json.dumps(conversation_json)
-    # return Response(generate_stream(conversation_json))
+    conversation_json = json.dumps(conversation_output)
+    return Response(conversation_json)
     # send it over in chunks
     # return Response(generate_stream(conversation_json))
 
