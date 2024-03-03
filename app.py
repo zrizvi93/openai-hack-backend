@@ -11,19 +11,25 @@ app = Flask(__name__)
 
 THREADS_MAP = {}
 
+# OpenAI Clients
 async_client = AsyncOpenAI(
     api_key=os.environ.get("OPENAI_API_KEY"),
 )
-
 client = OpenAI(
     api_key=os.environ.get("OPENAI_API_KEY"),
 )
 
-assistant = client.beta.assistants.create(
+# Assistants
+sharon_bot_assistant = client.beta.assistants.retrieve(assistant_id='asst_MdVycnMtxDnpID4AFUVGucA1')
+finn_bot_assistant = client.beta.assistants.retrieve(assistant_id='asst_J9iDe4fOUnS1FcMnOcGnn17f')
+generic_assistant = client.beta.assistants.create(
     name="Career Mentor",
     instructions="You are a career mentor. Answer questions briefly, in a sentence or less.",
     model="gpt-4-1106-preview",
 )
+
+
+# App Routes
 
 @app.route('/')
 def hello_world():
@@ -45,52 +51,64 @@ def generate_stream(user_input):
         )
         for chunk in stream:
             if chunk.choices[0].delta.content is not None:
+                print(str(chunk.choices[0].delta.content))
                 yield str(chunk.choices[0].delta.content)
-        # for chunk in stream:
-        #     if chunk['choices'][0]['message']['content']:
-        #         yield chunk['choices'][0]['message']['content']
     except Exception as e:
-        yield str(e)  # Handle exceptions
+        yield str(e)
 
 @app.route('/conversation', methods=['POST'])
 def conversation():
+    assistant = None
     user_input = request.json.get('message', '')
-    return Response(generate_stream(user_input))
+    sessionID = request.headers.get("sessionID", "")
+    # get the thread if it exists for the sessionID, if not, initialize a new thread for the session
+    thread = THREADS_MAP.get(sessionID, client.beta.threads.create())
+    if sessionID == 'sharon':
+        assistant = sharon_bot_assistant
+    elif sessionID == 'finn':
+        assistant = finn_bot_assistant
+    else:
+        assistant == generic_assistant
 
+    # Post the user message to the asssitant
+    message = client.beta.threads.messages.create(
+        thread_id=thread.id,
+        role="user",
+        content=user_input,
+    )
+    # Run the assistant
+    run = client.beta.threads.runs.create(
+        thread_id=thread.id,
+        assistant_id=assistant.id,
+        model="gpt-4-turbo-preview",
+        tools=[{"type": "retrieval"}]
+    )
+    while run.status in ["queued", "in_progress"]:
+        run = client.beta.threads.runs.retrieve(
+        thread_id=thread.id,
+        run_id=run.id
+        )
 
-# def stream_gpt4_responses(queue):
-#     async def async_stream():
-#         stream = await client.chat.completions.create(
-#             model="gpt-4",
-#             messages=[{"role": "user", "content": "How are you today?"}],
-#             stream=True,
-#         )
-#         async for chunk in stream:
-#             content = chunk.choices[0].message['content'] if chunk.choices else ""
-#             queue.put(content)
-#         queue.put(None)  # Signal the end of streaming
-
-#     loop = asyncio.new_event_loop()
-#     asyncio.set_event_loop(loop)
-#     loop.run_until_complete(async_stream())
-
-# @app.route('/gpt4async', methods=['GET'])
-# def gpt4_async_response():
-#     queue = Queue()
-#     def generate():
-#         t = threading.Thread(target=stream_gpt4_responses, args=(queue,))
-#         t.start()
-#         while True:
-#             try:
-#                 data = queue.get(timeout=30)  # Adjust timeout as needed
-#                 if data is None:  # Check if streaming is done
-#                     break
-#                 yield data
-#             except Empty:
-#                 break
-#         t.join()
-
-#     return Response(generate(), content_type='text/plain')
+    # It's possible the assistant can post multiple messages
+    # before the next user input
+    messages = client.beta.threads.messages.list(
+        thread_id=thread.id
+        )
+    conversation_output = []
+    # Only want the most recent messages in the thread sent by the assistant
+    for message in messages:
+        if message.role != "user":
+            conversation_output.append({"id": message.id,
+                                        "sessionID": message.thread_id,
+                                        "role": message.role,
+                                        "content": message.content
+                                        })
+        else:
+            break
+    # serialize json before sending over the wire
+    conversation_json = json.dumps(conversation_output)
+    # send it over in chunks
+    return Response(generate_stream(conversation_json))
 
 # @app.route('/picture', methods=['GET'])
 # def gpt4_response():
@@ -120,32 +138,33 @@ def gpt4_response():
             model="gpt-4-turbo-preview",
             max_tokens=1000
         )
-        return jsonify({'response': response.choices[0].message}), 200
+        return jsonify({'response': response.choices[0].message.content}), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-@app.route('/assistants', methods=['GET'])
-def assistants_response():
-    try:
-        sessionID = request.headers.get("sessionID", "")
-        # get the thread if it exists for the sessionID, if not, initialize a new thread for the session
-        thread = THREADS_MAP.get(sessionID,client.beta.threads.create())
-        message = client.beta.threads.messages.create(
-            thread_id=thread.id,
-            role="user",
-            content="I need to solve the equation `3x + 11 = 14`. Can you help me?",
-        )
-        return "In Progress", 200
-        # response = client.chat.completions.create(
-        #     model="gpt-4",
-        #     messages=[
-        #         {"role": "system", "content": "You are a helpful assistant."},
-        #         {"role": "user", "content": "How are you today?"}
-        #     ]
-        # )
-        # return jsonify({'response': response.choices[0].message['content'].strip()}), 200
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+# @app.route('/assistants', methods=['GET'])
+# def assistants_response():
+#     try:
+#         sessionID = request.headers.get("sessionID", "")
+#         # get the thread if it exists for the sessionID, if not, initialize a new thread for the session
+#         thread = THREADS_MAP.get(sessionID, client.beta.threads.create())
+
+#         message = client.beta.threads.messages.create(
+#             thread_id=thread.id,
+#             role="user",
+#             content="I need to solve the equation `3x + 11 = 14`. Can you help me?",
+#         )
+
+#         response = client.chat.completions.create(
+#             model="gpt-4",
+#             messages=[
+#                 {"role": "system", "content": "You are a helpful assistant."},
+#                 {"role": "user", "content": "How are you today?"}
+#             ]
+#         )
+#         return jsonify({'response': response.choices[0].message.content}), 200
+#     except Exception as e:
+#         return jsonify({'error': str(e)}), 500
 
 
 if __name__ == '__main__':
